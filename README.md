@@ -1,1 +1,1 @@
-# linguistics-agent
+# LLM for linguistics
