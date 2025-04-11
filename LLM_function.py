@@ -65,3 +65,29 @@ def analyze_1(content):
     result = response.choices[0].message.content
 
     return {"raw_result": result}
+
+def encode(sentence,rules):
+    """
+    将输入的哈佛语转换为token形式并给出对应token的属性
+    """
+    # 初始化LLM客户端
+    client = LLMClient()
+    
+    # 构建prompt
+    prompt = f"""请将以下哈佛语句子分解为语法单元，并标记每个成分的角色（主语、动词、时态、疑问标记等）：  
+                **输入句子**： {sentence}
+                **已知规则**： {rules} 
+                **输出格式**：  
+                - Tokens: [列表形式的分词结果]  
+                - Roles: [与Token对应的属性列表]"""
+                    
+    messages = [
+        {"role": "system", "content": "你是一个语言学专家，擅长分析不同语言的语法结构和词汇分类。"},
+        {"role": "user", "content": prompt}
+    ]
+    
+    response = client.chat_completion(messages=messages, temperature=0.2)
+    result = response.choices[0].message.content
+
+    return {"raw_result": result}
+
