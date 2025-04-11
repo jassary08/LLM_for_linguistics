@@ -91,3 +91,26 @@ def encode(sentence,rules):
 
     return {"raw_result": result}
 
+def decode(tokens,rules):
+    """
+    将输入的哈佛语token进行同态映射到中文，并按中文语法重组为通顺的句子
+    """
+    # 初始化LLM客户端
+    client = LLMClient()
+    
+    # 构建prompt
+    prompt = f"""请将以下哈佛语token同态映射到中文，并按中文语法重组为通顺的句子： 
+                **原始token**： {tokens}
+                **已知规则**： {rules} 
+                请输出重组以后的句子。
+                """
+                    
+    messages = [
+        {"role": "system", "content": "你是一个语言学专家，擅长分析不同语言的语法结构和词汇分类。"},
+        {"role": "user", "content": prompt}
+    ]
+    
+    response = client.chat_completion(messages=messages, temperature=0.2)
+    result = response.choices[0].message.content
+
+    return {"raw_result": result}
