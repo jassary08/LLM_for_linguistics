@@ -14,6 +14,8 @@
 
 3. **编码与解码**：我们借鉴密码学中同态映射的概念，将句子转换为结构化的token形式，以实现不同符号集合间的映射。
 
+4. **知识增强检索(RAG)**：利用向量数据库技术，实现对哈坤语知识库的语义检索，为LLM提供更准确的上下文信息。
+
 
 ## 技术架构
 
@@ -22,13 +24,18 @@
 - **LLM接口**：通过`llm_client.py`封装对大型语言模型API的调用
 - **语言分析模块**：`LLM_function.py`中实现了核心的语言分析功能
 - **示例应用**：`main.py`提供了完整的分析流程示例
+- **知识库模块**：`knowledge_base.py`存储哈坤语的语法规则和词汇信息
+- **向量检索**：使用FAISS实现高效的语义相似度搜索
 
 ## 使用方法
 
 ### 环境准备
 
 1. 确保已安装Python 3.6+
-2. 安装依赖：`pip install openai`
+2. 安装依赖：
+```bash
+pip install openai langchain langchain-openai faiss-cpu
+```
 
 ### 运行示例
 
@@ -38,8 +45,12 @@ python main.py
 
 ## 应用场景
 
-- IOLC(International Linguistics Olympiads Competition)
+- IOLC
+- 语言学研究中的语法规则提取
+- 跨语言文本分析与处理
 
 ## 未来展望
 
 - 支持更多种语言学竞赛题型
+- 优化RAG检索效果，提高知识利用率
+- 扩展知识库覆盖范围，支持更多语言特征
