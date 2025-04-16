@@ -21,12 +21,12 @@ def main():
     
     # 步骤1: 分析哈坤语词汇并进行分类
     print("\n2. 分析哈坤语词汇并进行分类:")
-    analysis_result = analyze_0(harvard_chinese_content)
+    analysis_result = extract_vocabulary(harvard_chinese_content)
     print(analysis_result["raw_result"])
     
     # 步骤2: 根据词汇分类，给出结构化规则
     print("\n3. 根据词汇分类，给出结构化规则:")
-    rules_result = analyze_1(analysis_result["raw_result"])
+    rules_result = generate_grammar_rules(analysis_result["raw_result"])
     print(rules_result["raw_result"])
 
     rules_json = rules_result["raw_result"]

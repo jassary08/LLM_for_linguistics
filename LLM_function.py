@@ -46,7 +46,7 @@ class RAG:
         docs = self.vectorstore.similarity_search(query, k=k)
         return "\n".join([doc.page_content for doc in docs])
 
-def analyze_0(content):
+def extract_vocabulary(content):
     """
     分析哈坤语和汉语对照内容，提取哈坤语词汇并进行分类
     """
@@ -85,7 +85,7 @@ def analyze_0(content):
 
     return {"raw_result": result}
 
-def analyze_1(content):
+def generate_grammar_rules(content):
     """
     根据哈坤语词汇分类，给出合并同类项后的结构化规则
     """
