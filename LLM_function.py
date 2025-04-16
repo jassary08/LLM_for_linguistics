@@ -1,15 +1,68 @@
 from llm_client import LLMClient
+from knowledge_base import KnowledgeBase
+from langchain.text_splitter import CharacterTextSplitter
+from langchain.vectorstores import FAISS
+from langchain_openai import OpenAIEmbeddings
+
+class RAG:
+    def __init__(self):
+        self.kb = KnowledgeBase()
+        # 使用已配置的API key
+        llm_client = LLMClient()
+        self.embeddings = OpenAIEmbeddings(
+            openai_api_key=llm_client.api_key,
+            base_url=llm_client.base_url
+        )
+        self.text_splitter = CharacterTextSplitter(
+            separator="\n",
+            chunk_size=1000,
+            chunk_overlap=200
+        )
+        
+        # 构建知识库向量存储
+        knowledge_texts = []
+        # 添加语法规则
+        knowledge_texts.extend(self.kb.get_grammar_rules())
+        
+        # 添加词汇分类
+        for category in ['subjects', 'verbs', 'tense_markers', 'question_markers', 'connectors']:
+            vocab = self.kb.get_vocabulary_by_category(category)
+            for item in vocab:
+                text = f"{item['token']}: {item['meaning']} ({category}, {item['notes']})"
+                knowledge_texts.append(text)
+        
+        # 添加分析示例
+        for example in self.kb.get_analysis_examples():
+            text = f"例句：{example['sentence']}\n翻译：{example['translation']}\n分析：{example['analysis']}"
+            knowledge_texts.append(text)
+            
+        # 创建文档chunks
+        docs = self.text_splitter.create_documents(knowledge_texts)
+        
+        # 构建向量存储
+        self.vectorstore = FAISS.from_documents(docs, self.embeddings)
+    
+    def get_relevant_context(self, query, k=3):
+        docs = self.vectorstore.similarity_search(query, k=k)
+        return "\n".join([doc.page_content for doc in docs])
 
 def analyze_0(content):
     """
     分析哈坤语和汉语对照内容，提取哈坤语词汇并进行分类
     """
-    # 初始化LLM客户端
+    # 初始化LLM客户端和RAG
     client = LLMClient()
+    rag = RAG()
     
+    # 获取相关上下文
+    relevant_context = rag.get_relevant_context(content)
+    print(relevant_context)
     # 构建prompt
     prompt = f"""以下是哈坤语与中文的对照例句：
                 {content}
+
+                基于以下相关的哈坤语知识：
+                {relevant_context}
 
                 任务：
                 - 列出所有哈坤语词汇，并为每个词汇标注其可能的类别：
@@ -20,7 +73,7 @@ def analyze_0(content):
                 - 其他（无法分类的词汇）
 
                 输出格式：
-                {{哈坤词汇: 类别（中文词汇）}}"""
+                哈坤词汇: 类别（中文词汇）"""
                     
     messages = [
         {"role": "system", "content": "你是一个语言学专家，擅长分析不同语言的语法结构和词汇分类。"},

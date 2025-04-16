@@ -1,7 +1,7 @@
 from openai import OpenAI
 
 # API配置
-API_SECRET_KEY = "sk-zk2401d2ebeef4b3db1a034d699056eff3367f933b8c6170"
+API_SECRET_KEY = "your_api_secret_key"
 BASE_URL = "https://api.zhizengzeng.com/v1/"
 
 class LLMClient:

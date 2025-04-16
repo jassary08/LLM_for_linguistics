@@ -15,8 +15,7 @@ def main():
     9. tarum kəmə nirum lapkʰi ri ne 他们看见我们吗?
     10. ati kəmə ŋa lapkʰi tʰɤ ne 他（过去时）看见我吗?
     """
-    
-    print("=== 测试哈坤语分析流程 ===")
+
     print("\n1. 原始哈坤语和汉语对照内容:")
     print(harvard_chinese_content)
     
