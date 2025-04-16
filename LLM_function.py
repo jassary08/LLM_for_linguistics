@@ -46,7 +46,7 @@ class RAG:
         docs = self.vectorstore.similarity_search(query, k=k)
         return "\n".join([doc.page_content for doc in docs])
 
-def extract_vocabulary(content):
+def extract(content):
     """
     分析哈坤语和汉语对照内容，提取哈坤语词汇并进行分类
     """
@@ -85,7 +85,7 @@ def extract_vocabulary(content):
 
     return {"raw_result": result}
 
-def generate_grammar_rules(content):
+def generate_rules(content):
     """
     根据哈坤语词汇分类，给出合并同类项后的结构化规则
     """
@@ -173,3 +173,57 @@ def decode(tokens,rules):
     result = response.choices[0].message.content
 
     return {"raw_result": result}
+
+def verify(hakun_text, chinese_text, rules):
+    """
+    验证哈坤语到汉语的翻译是否正确，并提供详细的推理过程
+    """
+    client = LLMClient()
+    
+    # 使用 json 字符串作为模板
+    result_template = '''
+    {
+        "is_correct": true/false,
+        "analysis": {
+            "vocabulary_check": "词汇映射分析",
+            "grammar_check": "语法结构分析",
+            "semantic_check": "语义完整性分析"
+        },
+        "reasoning": "详细的推理过程",
+        "suggestions": "如果有错误，给出修正建议"
+    }
+    '''
+       
+    prompt = f"""请验证以下哈坤语翻译是否正确：
+                哈坤语原文：{hakun_text}
+                汉语译文：{chinese_text}
+                语法规则：{rules}
+
+                请按以下步骤进行分析：
+                1. 词汇映射验证：
+                - 检查每个哈坤语词汇是否正确对应到汉语
+                - 标注任何不匹配或可疑的映射
+
+                2. 语法结构验证：
+                - 分析哈坤语的语法结构
+                - 验证汉语译文是否保持了相同的语法关系
+
+                3. 语义完整性：
+                - 确认译文是否完整传达了原文的所有信息
+                - 检查是否有遗漏或添加的信息
+
+                4. 推理过程：
+                - 详细说明如何得出验证结论
+                - 引用相关的语法规则支持你的判断
+
+                输出格式：{result_template}"""
+    
+    messages = [
+        {"role": "system", "content": "你是一个严谨的语言学专家，擅长分析和验证语言翻译的准确性。"},
+        {"role": "user", "content": prompt}
+    ]
+    
+    response = client.chat_completion(messages=messages, temperature=0.2)
+    result = response.choices[0].message.content
+    
+    return {"verification_result": result}

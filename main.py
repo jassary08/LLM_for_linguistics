@@ -1,4 +1,4 @@
-from LLM_function import analyze_0, analyze_1, encode, decode
+from LLM_function import extract, generate_rules, encode, decode, verify
 import json
 
 def main():
@@ -21,12 +21,12 @@ def main():
     
     # 步骤1: 分析哈坤语词汇并进行分类
     print("\n2. 分析哈坤语词汇并进行分类:")
-    analysis_result = extract_vocabulary(harvard_chinese_content)
+    analysis_result = extract(harvard_chinese_content)
     print(analysis_result["raw_result"])
     
     # 步骤2: 根据词汇分类，给出结构化规则
     print("\n3. 根据词汇分类，给出结构化规则:")
-    rules_result = generate_grammar_rules(analysis_result["raw_result"])
+    rules_result = generate_rules(analysis_result["raw_result"])
     print(rules_result["raw_result"])
 
     rules_json = rules_result["raw_result"]
@@ -38,11 +38,22 @@ def main():
     print(encode_result["raw_result"])
     
     # 步骤4: 测试decode函数 - 将token转换为中文句子
-    # 从encode结果中提取tokens
     tokens_text = encode_result["raw_result"]
     print("\n5. 测试decode函数 - 将token转换为中文句子:")
     decode_result = decode(tokens_text, rules_json)
     print(decode_result["raw_result"])
+    
+    # 步骤5: 验证翻译结果
+    print("\n6. 验证翻译结果:")
+    verification_result = verify(
+        hakun_text=test_sentence,
+        chinese_text=decode_result["raw_result"],
+        rules=rules_json
+    )
+    print("验证结果:")
+    print(json.dumps(verification_result["verification_result"], 
+                    ensure_ascii=False, 
+                    indent=2))
 
 if __name__ == "__main__":
     main()
