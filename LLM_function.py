@@ -46,7 +46,7 @@ class RAG:
         docs = self.vectorstore.similarity_search(query, k=k)
         return "\n".join([doc.page_content for doc in docs])
 
-def extract(content, retry_key=None):
+def extract(content):
     """
     分析哈坤语和汉语对照内容，提取哈坤语词汇并进行分类
     """
@@ -57,13 +57,11 @@ def extract(content, retry_key=None):
     # 获取相关上下文
     relevant_context = rag.get_relevant_context(content)
 
-    # 构建prompt
-    retry_focus = f"\n请特别关注以下问题：{retry_key}" if retry_key else ""
     prompt = f"""以下是哈坤语与中文的对照例句：
                 {content}
 
                 基于以下相关的哈坤语知识：
-                {relevant_context}{retry_focus}
+                {relevant_context}
                 
                 任务：
                 - 列出所有哈坤语词汇，并为每个词汇标注其可能的类别：
@@ -86,17 +84,15 @@ def extract(content, retry_key=None):
 
     return {"raw_result": result}
 
-def generate_rules(content, retry_key=None):
+def generate_rules(content):
     """
     根据哈坤语词汇分类，给出合并同类项后的结构化规则
     """
     # 初始化LLM客户端
     client = LLMClient()
     
-    # 构建prompt
-    retry_focus = f"\n请特别关注以下问题：{retry_key}" if retry_key else ""
     prompt = f"""以下是哈坤语词汇分类：
-                    {content}{retry_focus}
+                    {content}
 
                     任务：
                     - 规则泛化（合并同类项），将相同属性的词汇进行合并。
@@ -127,18 +123,16 @@ def generate_rules(content, retry_key=None):
 
     return {"raw_result": result}
 
-def encode(sentence, rules, retry_key=None):
+def encode(sentence, rules):
     """
     将输入的哈坤语转换为token形式并给出对应token的属性
     """
     # 初始化LLM客户端
     client = LLMClient()
-    
-    # 构建prompt
-    retry_focus = f"\n请特别关注以下问题：{retry_key}" if retry_key else ""
+
     prompt = f"""请将以下哈坤语句子分解为语法单元，并标记每个成分的角色（主语、动词、时态、疑问标记等）：  
                 **输入句子**： {sentence}
-                **已知规则**： {rules}{retry_focus}
+                **已知规则**： {rules}
                 **输出格式**：  
                 - Tokens: [列表形式的分词结果]  
                 - Roles: [与Token对应的属性列表]
@@ -154,18 +148,17 @@ def encode(sentence, rules, retry_key=None):
 
     return {"raw_result": result}
 
-def decode(tokens, rules, retry_key=None):
+def decode(tokens, rules):
     """
     将输入的哈坤语token进行同态映射到中文，并按中文语法重组为通顺的句子
     """
     # 初始化LLM客户端
     client = LLMClient()
     
-    # 构建prompt
-    retry_focus = f"\n请特别关注以下问题：{retry_key}" if retry_key else ""
+
     prompt = f"""请将以下哈坤语token同态映射到中文，并按中文语法重组为通顺的句子： 
                 **原始token**： {tokens}
-                **已知规则**： {rules}{retry_focus}
+                **已知规则**： {rules}
                 只输出最终的汉语句子。
                 """
                     
@@ -173,7 +166,7 @@ def decode(tokens, rules, retry_key=None):
         {"role": "system", "content": "你是一位语言转换专家，精通语言间的映射转换。你需要在保持原文语义的基础上，生成符合目标语言语法规范的表达。"},
         {"role": "user", "content": prompt}
     ]
-    print(prompt)
+
     response = client.chat_completion(messages=messages, temperature=0.2)
     result = response.choices[0].message.content
 
@@ -197,7 +190,7 @@ def verify(secret_text, known_text, rules, origin_rules):
         "reasoning": "详细的推理过程",
         "suggestions": "优化建议",
         "input_for_retry": {
-            "content": "如果需要重新推理，这里是需要重点关注的内容"
+            "content": "如果需要重新推理，这里是需要重点关注的内容，以文本格式给出即可"
         }
     }
     '''
@@ -257,54 +250,74 @@ def verify(secret_text, known_text, rules, origin_rules):
     return result
 
 
-def adjust(action, retry_content, original_content=None, rules=None):
+def adjust(action, retry_content, original_input=None, original_output=None):
     """
-    根据verify的结果生成对应action的优化prompt
+    根据verify的结果和上一轮的输入输出，生成优化后的结果
     Args:
         action: verify返回的action类型
         retry_content: verify中input_for_retry的内容
-        original_content: 原始输入内容（用于extract和encode）
-        rules: 规则内容（用于encode和decode）
-    Returns:
-        与原思维链步骤相同格式的结果
+        original_input: 上一轮该步骤的输入内容
+        original_output: 上一轮该步骤的输出内容
     """
     client = LLMClient()
     
     prompts = {
-        "extract": f"""请重新分析以下哈坤语词汇，特别关注：
+        "extract": f"""基于上一轮的分析结果，请重新分析哈坤语词汇：
+                    
+                    原始规则：
+                    {original_input}
+
+                    上一轮分析结果：
+                    {original_output}
+
+                    需要特别关注的问题：
                     {retry_content}
-                    
-                    原始内容：
-                    {original_content}
-                    
-                    请仔细分析每个词汇的语法功能和语义角色，确保分类准确。
+
+                    请对上述分析结果进行调整，重点关注提到的问题。
+                    保持合理的分类结果，调整存在问题的部分。
                     
                     输出格式：
                     哈坤词汇: 类别（中文词汇）""",
                     
-        "generate_rules": f"""基于以下反馈：
+        "generate_rules": f"""基于上一轮生成的规则，进行优化调整：
+
+                    原始规则：
+                    {original_input}
+
+                    上一轮规则：
+                    {original_output}
+
+                    需要调整的问题：
                     {retry_content}
-                    
-                    请重新生成更准确的结构化规则。注意解决提到的具体问题。
+
+                    请对规则进行针对性修改，确保解决提到的问题。
                     
                     输出格式：
                     只输出JSON格式的规则映射表。""",
                     
-        "encode": f"""根据以下反馈：
+        "encode": f"""基于上一轮的编码结果，进行优化：
+
+                    上一轮输入：{original_input}
+                    上一轮结果：{original_output}
+
+                    需要调整的问题：
                     {retry_content}
-                    
-                    请重新分析句子：{original_content}
-                    使用规则：{rules}
+
+                    请对token分解和角色标注进行调整，重点解决提到的问题。
                     
                     输出格式：
                     - Tokens: [列表形式的分词结果]
                     - Roles: [与Token对应的属性列表]""",
                     
-        "decode": f"""基于以下反馈：
+        "decode": f"""基于上一轮的翻译结果，进行优化：
+
+                    上一轮输入：{original_input}
+                    上一轮翻译：{original_output}
+
+                    需要调整的问题：
                     {retry_content}
-                    
-                    请使用规则：{rules}
-                    重新翻译并确保语序和语义准确。
+
+                    请对翻译进行针对性修改，确保解决语序或语义问题。
                     
                     只输出最终的汉语句子。"""
     }
@@ -313,7 +326,7 @@ def adjust(action, retry_content, original_content=None, rules=None):
         return {"error": "未知的action类型"}
         
     messages = [
-        {"role": "system", "content": "你是一位语言分析专家，需要根据具体反馈优化分析结果。"},
+        {"role": "system", "content": "你是一位语言分析专家，需要根据具体反馈优化已有的分析结果。请保持合理的部分，针对性地调整存在问题的部分。"},
         {"role": "user", "content": prompts[action]}
     ]
     

@@ -1,28 +1,27 @@
-from llm_function import extract, generate_rules, encode, decode, verify
+from llm_function import extract, generate_rules, encode, decode, verify, adjust 
 import json
 
 def ReasoningChain(origin_rules,secret_text, max_retries=3):
     retry_count = 0
     current_step = "extract"
     result_history = {}
-    retry_key = None
     
     while retry_count < max_retries:
         if current_step == "extract":
             # 步骤1: 分析哈坤语词汇并进行分类
-            analysis_result = extract(origin_rules,retry_key)
+            analysis_result = extract(origin_rules)
             result_history["extract"] = analysis_result
             current_step = "generate_rules"
             
         elif current_step == "generate_rules":
             # 步骤2: 根据词汇分类，生成结构化规则
-            rules_result = generate_rules(result_history["extract"]["raw_result"], retry_key)
+            rules_result = generate_rules(result_history["extract"]["raw_result"])
             result_history["rules"] = rules_result
             current_step = "encode"
             
         elif current_step == "encode":
             # 步骤3: 将哈坤语句子转换为token
-            encode_result = encode(secret_text, result_history["rules"]["raw_result"], retry_key)
+            encode_result = encode(secret_text, result_history["rules"]["raw_result"])
             result_history["encode"] = encode_result
             current_step = "decode"
             
@@ -30,8 +29,7 @@ def ReasoningChain(origin_rules,secret_text, max_retries=3):
             # 步骤4: 将token转换为中文句子
             decode_result = decode(
                 result_history["encode"]["raw_result"],
-                result_history["rules"]["raw_result"],
-                retry_key
+                result_history["rules"]["raw_result"]
             )
             result_history["decode"] = decode_result
             current_step = "verify"
@@ -65,9 +63,49 @@ def ReasoningChain(origin_rules,secret_text, max_retries=3):
             else:
                 # 如果需要重试，更新当前步骤和输入
                 current_step = verify_data["action"]
-                if "input_for_retry" in verify_data:
-                    retry_key = verify_data["input_for_retry"]["content"]
                 retry_count += 1
+                
+                # 根据当前步骤获取需要调整的输入和输出
+                if current_step == "extract":
+                    adjusted_result = adjust(
+                        action="extract",
+                        retry_content=verify_data["input_for_retry"]["content"],
+                        original_input=origin_rules,
+                        original_output=result_history["extract"]["raw_result"]
+                    )
+                    result_history["extract"] = adjusted_result
+                    current_step = "generate_rules"
+                    
+                elif current_step == "generate_rules":
+                    adjusted_result = adjust(
+                        action="generate_rules",
+                        retry_content=verify_data["input_for_retry"]["content"],
+                        original_input=result_history["extract"]["raw_result"],
+                        original_output=result_history["rules"]["raw_result"]
+                    )
+                    result_history["rules"] = adjusted_result
+                    current_step = "encode"
+                    
+                elif current_step == "encode":
+                    adjusted_result = adjust(
+                        action="encode",
+                        retry_content=verify_data["input_for_retry"]["content"],
+                        original_input=secret_text + result_history["rules"]["raw_result"],
+                        original_output=result_history["encode"]["raw_result"]
+                    )
+                    result_history["encode"] = adjusted_result
+                    current_step = "decode"
+                    
+                elif current_step == "decode":
+                    adjusted_result = adjust(
+                        action="decode",
+                        retry_content=verify_data["input_for_retry"]["content"],
+                        original_input=secret_text + result_history["encode"]["raw_result"] + result_history["rules"]["raw_result"],
+                        original_output=result_history["decode"]["raw_result"]
+                    )
+                    result_history["decode"] = adjusted_result
+                    current_step = "verify"
+                    
     
     return {
         "success": False,
