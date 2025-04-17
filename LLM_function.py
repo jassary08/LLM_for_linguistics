@@ -1,7 +1,7 @@
 from llm_client import LLMClient
 from knowledge_base import KnowledgeBase
 from langchain.text_splitter import CharacterTextSplitter
-from langchain.vectorstores import FAISS
+from langchain_community.vectorstores import FAISS
 from langchain_openai import OpenAIEmbeddings
 
 class RAG:
@@ -46,7 +46,7 @@ class RAG:
         docs = self.vectorstore.similarity_search(query, k=k)
         return "\n".join([doc.page_content for doc in docs])
 
-def extract(content):
+def extract(content, retry_key=None):
     """
     分析哈坤语和汉语对照内容，提取哈坤语词汇并进行分类
     """
@@ -56,14 +56,15 @@ def extract(content):
     
     # 获取相关上下文
     relevant_context = rag.get_relevant_context(content)
-    print(relevant_context)
+
     # 构建prompt
+    retry_focus = f"\n请特别关注以下问题：{retry_key}" if retry_key else ""
     prompt = f"""以下是哈坤语与中文的对照例句：
                 {content}
 
                 基于以下相关的哈坤语知识：
-                {relevant_context}
-
+                {relevant_context}{retry_focus}
+                
                 任务：
                 - 列出所有哈坤语词汇，并为每个词汇标注其可能的类别：
                 - 主语（如"我/你/他/我们/你们/他们"）
@@ -76,7 +77,7 @@ def extract(content):
                 哈坤词汇: 类别（中文词汇）"""
                     
     messages = [
-        {"role": "system", "content": "你是一个语言学专家，擅长分析不同语言的语法结构和词汇分类。"},
+        {"role": "system", "content": "你是一位专精于语言分析的语言学家，擅长识别和分类语言中的词汇单元。你需要仔细分析每个词汇的语法功能和语义角色。"},
         {"role": "user", "content": prompt}
     ]
     
@@ -85,7 +86,7 @@ def extract(content):
 
     return {"raw_result": result}
 
-def generate_rules(content):
+def generate_rules(content, retry_key=None):
     """
     根据哈坤语词汇分类，给出合并同类项后的结构化规则
     """
@@ -93,8 +94,9 @@ def generate_rules(content):
     client = LLMClient()
     
     # 构建prompt
+    retry_focus = f"\n请特别关注以下问题：{retry_key}" if retry_key else ""
     prompt = f"""以下是哈坤语词汇分类：
-                    {content}
+                    {content}{retry_focus}
 
                     任务：
                     - 规则泛化（合并同类项），将相同属性的词汇进行合并。
@@ -116,7 +118,7 @@ def generate_rules(content):
                     """
                     
     messages = [
-        {"role": "system", "content": "你是一个语言学专家，擅长分析不同语言的语法结构和词汇分类。"},
+        {"role": "system", "content": "你是一位语言规则专家，擅长归纳和总结语言规律，能够将具体语言现象抽象为通用规则。你需要系统地组织和结构化语言规则。"},
         {"role": "user", "content": prompt}
     ]
     
@@ -125,7 +127,7 @@ def generate_rules(content):
 
     return {"raw_result": result}
 
-def encode(sentence,rules):
+def encode(sentence, rules, retry_key=None):
     """
     将输入的哈坤语转换为token形式并给出对应token的属性
     """
@@ -133,15 +135,16 @@ def encode(sentence,rules):
     client = LLMClient()
     
     # 构建prompt
+    retry_focus = f"\n请特别关注以下问题：{retry_key}" if retry_key else ""
     prompt = f"""请将以下哈坤语句子分解为语法单元，并标记每个成分的角色（主语、动词、时态、疑问标记等）：  
                 **输入句子**： {sentence}
-                **已知规则**： {rules} 
+                **已知规则**： {rules}{retry_focus}
                 **输出格式**：  
                 - Tokens: [列表形式的分词结果]  
                 - Roles: [与Token对应的属性列表]"""
                     
     messages = [
-        {"role": "system", "content": "你是一个语言学专家，擅长分析不同语言的语法结构和词汇分类。"},
+        {"role": "system", "content": "你是一位计算语言学专家，专注于语言单元的分析和标注。你需要准确识别每个语言成分的语法角色，并进行规范化的标记。"},
         {"role": "user", "content": prompt}
     ]
     
@@ -150,7 +153,7 @@ def encode(sentence,rules):
 
     return {"raw_result": result}
 
-def decode(tokens,rules):
+def decode(tokens, rules, retry_key=None):
     """
     将输入的哈坤语token进行同态映射到中文，并按中文语法重组为通顺的句子
     """
@@ -158,14 +161,15 @@ def decode(tokens,rules):
     client = LLMClient()
     
     # 构建prompt
+    retry_focus = f"\n请特别关注以下问题：{retry_key}" if retry_key else ""
     prompt = f"""请将以下哈坤语token同态映射到中文，并按中文语法重组为通顺的句子： 
                 **原始token**： {tokens}
-                **已知规则**： {rules} 
+                **已知规则**： {rules}{retry_focus}
                 只输出最终的汉语句子。
                 """
                     
     messages = [
-        {"role": "system", "content": "你是一个语言学专家，擅长分析不同语言的语法结构和词汇分类。"},
+        {"role": "system", "content": "你是一位语言转换专家，精通语言间的映射转换。你需要在保持原文语义的基础上，生成符合目标语言语法规范的表达。"},
         {"role": "user", "content": prompt}
     ]
     
@@ -174,52 +178,65 @@ def decode(tokens,rules):
 
     return {"raw_result": result}
 
-def verify(hakun_text, chinese_text, rules):
+def verify(secret_text, known_text, rules, origin_rules):
     """
-    验证哈坤语到汉语的翻译是否正确，并提供详细的推理过程
+    验证哈坤语到汉语的翻译是否正确，并提供详细的推理过程和下一步行动建议
     """
     client = LLMClient()
     
-    # 使用 json 字符串作为模板
     result_template = '''
-    {
-        "is_correct": true/false,
+    {   
+        "is_true": "true/false",
+        "action": "output/extract/generate_rules/encode/decode",
         "analysis": {
             "vocabulary_check": "词汇映射分析",
             "grammar_check": "语法结构分析",
             "semantic_check": "语义完整性分析"
         },
         "reasoning": "详细的推理过程",
-        "suggestions": "如果有错误，给出修正建议"
+        "suggestions": "优化建议",
+        "input_for_retry": {
+            "content": "如果需要重试，这里是需要重点关注的内容"
+        }
     }
     '''
        
-    prompt = f"""请验证以下哈坤语翻译是否正确：
-                哈坤语原文：{hakun_text}
-                汉语译文：{chinese_text}
-                语法规则：{rules}
+    prompt = f"""请验证以下哈坤语翻译是否正确，并给出下一步行动建议：
+                原始的规则：{origin_rules}
+                经过推理后提取的语法规则：{rules}
+                需要翻译的哈坤语原文：{secret_text}
+                经过推理后的汉语译文：{known_text}
 
-                请按以下步骤进行分析：
-                1. 词汇映射验证：
-                - 检查每个哈坤语词汇是否正确对应到汉语
-                - 标注任何不匹配或可疑的映射
+                翻译正确的标准：
+                1. 词汇映射基本正确：
+                - 主要词汇（如主语、谓语）映射正确
+                - 时态标记大致对应
+                - 允许部分连接词或语气词有细微差异
 
-                2. 语法结构验证：
-                - 分析哈坤语的语法结构
-                - 验证汉语译文是否保持了相同的语法关系
+                2. 语法结构基本对应：
+                - 主要句子成分的顺序正确
+                - 允许有轻微的语序调整以符合中文表达习惯
 
-                3. 语义完整性：
-                - 确认译文是否完整传达了原文的所有信息
-                - 检查是否有遗漏或添加的信息
+                3. 语义表达基本准确：
+                - 核心语义传达正确
+                - 允许有细微的表达差异，但不影响整体理解
+                - 疑问语气表达清晰
 
-                4. 推理过程：
-                - 详细说明如何得出验证结论
-                - 引用相关的语法规则支持你的判断
+                行动建议：
+                如果根据现有的规则翻译正确：
+                - 即可返回is_true为"true"
+                - 输出 "output" 作为 action
+                如果翻译不正确，根据推理结果给出下一步的行动建议：
+                - 如果需要重新提取词汇，返回 "extract" 作为 action
+                - 如果需要重新生成规则，返回 "generate_rules" 作为 action
+                - 如果需要重新进行编码，返回 "encode" 作为 action
+                - 如果需要重新进行解码，返回 "decode" 作为 action
+                - 对于"false"的情况，请在 input_for_retry 中提供再次思考时需要重点关注的内容
 
                 输出格式：{result_template}"""
     
     messages = [
-        {"role": "system", "content": "你是一个严谨的语言学专家，擅长分析和验证语言翻译的准确性。"},
+        {"role": "system", "content": "你是一位语言质量评估专家，擅长分析翻译的准确性和完整性。你需要从词汇、语法和语义三个层面严格评估翻译质量，并提供具体的改进建议。"},
         {"role": "user", "content": prompt}
     ]
     
