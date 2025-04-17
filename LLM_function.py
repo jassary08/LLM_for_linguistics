@@ -141,7 +141,8 @@ def encode(sentence, rules, retry_key=None):
                 **已知规则**： {rules}{retry_focus}
                 **输出格式**：  
                 - Tokens: [列表形式的分词结果]  
-                - Roles: [与Token对应的属性列表]"""
+                - Roles: [与Token对应的属性列表]
+                无需给出分析过程与其他多余部分"""
                     
     messages = [
         {"role": "system", "content": "你是一位计算语言学专家，专注于语言单元的分析和标注。你需要准确识别每个语言成分的语法角色，并进行规范化的标记。"},
@@ -172,7 +173,7 @@ def decode(tokens, rules, retry_key=None):
         {"role": "system", "content": "你是一位语言转换专家，精通语言间的映射转换。你需要在保持原文语义的基础上，生成符合目标语言语法规范的表达。"},
         {"role": "user", "content": prompt}
     ]
-    
+    print(prompt)
     response = client.chat_completion(messages=messages, temperature=0.2)
     result = response.choices[0].message.content
 
@@ -196,7 +197,7 @@ def verify(secret_text, known_text, rules, origin_rules):
         "reasoning": "详细的推理过程",
         "suggestions": "优化建议",
         "input_for_retry": {
-            "content": "如果需要重试，这里是需要重点关注的内容"
+            "content": "如果需要重新推理，这里是需要重点关注的内容"
         }
     }
     '''
@@ -208,30 +209,40 @@ def verify(secret_text, known_text, rules, origin_rules):
                 经过推理后的汉语译文：{known_text}
 
                 翻译正确的标准：
-                1. 词汇映射基本正确：
-                - 主要词汇（如主语、谓语）映射正确
-                - 时态标记大致对应
-                - 允许部分连接词或语气词有细微差异
 
-                2. 语法结构基本对应：
+                1. 语法结构基本对应：
                 - 主要句子成分的顺序正确
                 - 允许有轻微的语序调整以符合中文表达习惯
 
-                3. 语义表达基本准确：
+                2. 语义表达基本准确：
                 - 核心语义传达正确
                 - 允许有细微的表达差异，但不影响整体理解
                 - 疑问语气表达清晰
+                
+                3. 对于规则中没有出现的词汇，推测合理即可，无需重新推理。
 
                 行动建议：
                 如果根据现有的规则翻译正确：
                 - 即可返回is_true为"true"
                 - 输出 "output" 作为 action
-                如果翻译不正确，根据推理结果给出下一步的行动建议：
-                - 如果需要重新提取词汇，返回 "extract" 作为 action
-                - 如果需要重新生成规则，返回 "generate_rules" 作为 action
-                - 如果需要重新进行编码，返回 "encode" 作为 action
-                - 如果需要重新进行解码，返回 "decode" 作为 action
-                - 对于"false"的情况，请在 input_for_retry 中提供再次思考时需要重点关注的内容
+                如果翻译不正确，根据推理结果给出下一步行动建议：
+                - 如果需要重新提取词汇（extract）：
+                  在input_for_retry中详细说明哪些词汇需要重新分析，以及可能的词性或语法功能
+                
+                - 如果需要重新生成规则（generate_rules）：
+                  在input_for_retry中指出当前规则的具体问题，如某类词汇的映射规则缺失或不准确
+                
+                - 如果需要重新进行编码（encode）：
+                  在input_for_retry中说明token分解或角色标注的具体问题
+                
+                - 如果需要重新进行解码（decode）：
+                  在input_for_retry中指出当前翻译中的具体语序或语义问题
+
+                对于每种情况，input_for_retry都应该：
+                1. 明确指出当前步骤的具体问题
+                2. 提供可能的解决方向
+                3. 给出具体的例子说明问题
+                4. 避免模糊不清的表述
 
                 输出格式：{result_template}"""
     
@@ -243,4 +254,71 @@ def verify(secret_text, known_text, rules, origin_rules):
     response = client.chat_completion(messages=messages, temperature=0.2)
     result = response.choices[0].message.content
     
-    return {"verification_result": result}
+    return result
+
+
+def adjust(action, retry_content, original_content=None, rules=None):
+    """
+    根据verify的结果生成对应action的优化prompt
+    Args:
+        action: verify返回的action类型
+        retry_content: verify中input_for_retry的内容
+        original_content: 原始输入内容（用于extract和encode）
+        rules: 规则内容（用于encode和decode）
+    Returns:
+        与原思维链步骤相同格式的结果
+    """
+    client = LLMClient()
+    
+    prompts = {
+        "extract": f"""请重新分析以下哈坤语词汇，特别关注：
+                    {retry_content}
+                    
+                    原始内容：
+                    {original_content}
+                    
+                    请仔细分析每个词汇的语法功能和语义角色，确保分类准确。
+                    
+                    输出格式：
+                    哈坤词汇: 类别（中文词汇）""",
+                    
+        "generate_rules": f"""基于以下反馈：
+                    {retry_content}
+                    
+                    请重新生成更准确的结构化规则。注意解决提到的具体问题。
+                    
+                    输出格式：
+                    只输出JSON格式的规则映射表。""",
+                    
+        "encode": f"""根据以下反馈：
+                    {retry_content}
+                    
+                    请重新分析句子：{original_content}
+                    使用规则：{rules}
+                    
+                    输出格式：
+                    - Tokens: [列表形式的分词结果]
+                    - Roles: [与Token对应的属性列表]""",
+                    
+        "decode": f"""基于以下反馈：
+                    {retry_content}
+                    
+                    请使用规则：{rules}
+                    重新翻译并确保语序和语义准确。
+                    
+                    只输出最终的汉语句子。"""
+    }
+    
+    if action not in prompts:
+        return {"error": "未知的action类型"}
+        
+    messages = [
+        {"role": "system", "content": "你是一位语言分析专家，需要根据具体反馈优化分析结果。"},
+        {"role": "user", "content": prompts[action]}
+    ]
+    
+    response = client.chat_completion(messages=messages, temperature=0.2)
+    result = response.choices[0].message.content
+    
+    return {"raw_result": result}
+
