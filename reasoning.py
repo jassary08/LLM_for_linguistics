@@ -42,7 +42,6 @@ def ReasoningChain(origin_rules,secret_text, max_retries=3):
                 rules=result_history["rules"]["raw_result"],
                 origin_rules=origin_rules,
             )
-            print(verification_result)
             
             if verification_result.startswith("```json"):
                 verification_result = verification_result[7:]  # 移除开头的```json

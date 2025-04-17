@@ -1,9 +1,9 @@
 from openai import OpenAI
 
 # API配置
-ZHIZENGZENG_API_KEY = "sk-zk2401d2ebeef4b3db1a034d699056eff3367f933b8c6170"
+ZHIZENGZENG_API_KEY = "your-api-key"
 ZHIZENGZENG_BASE_URL = "https://api.zhizengzeng.com/v1/"
-DEEPSEEK_API_KEY = "sk-66952492e6464a3da6f79d04d62ed89e"  
+DEEPSEEK_API_KEY = "your-api-key"  
 DEEPSEEK_BASE_URL = "https://api.deepseek.com/v1"
 
 class LLMClient:
