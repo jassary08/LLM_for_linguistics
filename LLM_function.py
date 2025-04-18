@@ -8,11 +8,19 @@ class RAG:
     def __init__(self):
         self.kb = KnowledgeBase()
         # 使用已配置的API key
-        llm_client = LLMClient()
-        self.embeddings = OpenAIEmbeddings(
-            openai_api_key=llm_client.api_key,
-            base_url=llm_client.base_url
-        )
+        self.llm_client = LLMClient()
+        
+        # 根据provider选择embeddings实现
+        if self.llm_client.provider == "zhizengzeng":
+            self.embeddings = OpenAIEmbeddings(
+                openai_api_key=self.llm_client.api_key,
+                base_url=self.llm_client.base_url
+            )
+        elif self.llm_client.provider == "openai":
+            self.embeddings = OpenAIEmbeddings(
+                openai_api_key=self.llm_client.api_key
+            )
+            
         self.text_splitter = CharacterTextSplitter(
             separator="\n",
             chunk_size=1000,
@@ -253,11 +261,6 @@ def verify(secret_text, known_text, rules, origin_rules):
 def adjust(action, retry_content, original_input=None, original_output=None):
     """
     根据verify的结果和上一轮的输入输出，生成优化后的结果
-    Args:
-        action: verify返回的action类型
-        retry_content: verify中input_for_retry的内容
-        original_input: 上一轮该步骤的输入内容
-        original_output: 上一轮该步骤的输出内容
     """
     client = LLMClient()
     
