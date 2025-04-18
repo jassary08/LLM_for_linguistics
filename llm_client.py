@@ -6,12 +6,14 @@ ZHIZENGZENG_BASE_URL = "https://api.zhizengzeng.com/v1/"
 DEEPSEEK_API_KEY = "your-api-key"  
 DEEPSEEK_BASE_URL = "https://api.deepseek.com/v1"
 OPENAI_API_KEY = "your-api-key"  
+QWEN_API_KEY = "your-api-key"  
+QWEN_BASE_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1"
 
 class LLMClient:
     def __init__(self, 
                  api_key: str = None, 
                  base_url: str = None,
-                 provider: str = "openai"):  
+                 provider: str = "qwen"):  
         self.provider = provider
         
         # 根据 provider 初始化不同的客户端
@@ -34,9 +36,16 @@ class LLMClient:
             self.client = OpenAI(
                 api_key=self.api_key
             )
+        elif provider == "qwen":
+            self.api_key = QWEN_API_KEY
+            self.base_url = QWEN_BASE_URL
+            self.client = OpenAI(
+                api_key=self.api_key,
+                base_url=self.base_url
+            )
 
 
-    def chat_completion(self, messages, model="gpt-4", temperature=0.7, **kwargs):
+    def chat_completion(self, messages, model="qwen-max", temperature=0.7, **kwargs):
             
         return self.client.chat.completions.create(
             messages=messages,

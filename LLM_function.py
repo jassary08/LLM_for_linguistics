@@ -3,13 +3,19 @@ from knowledge_base import KnowledgeBase
 from langchain.text_splitter import CharacterTextSplitter
 from langchain_community.vectorstores import FAISS
 from langchain_openai import OpenAIEmbeddings
+from langchain_community.embeddings import DashScopeEmbeddings
 
 class RAG:
     def __init__(self):
         self.kb = KnowledgeBase()
         # 使用已配置的API key
         self.llm_client = LLMClient()
-        
+            
+        self.text_splitter = CharacterTextSplitter(
+            separator="\n",
+            chunk_size=1000,
+            chunk_overlap=200
+        )
         # 根据provider选择embeddings实现
         if self.llm_client.provider == "zhizengzeng":
             self.embeddings = OpenAIEmbeddings(
@@ -20,13 +26,12 @@ class RAG:
             self.embeddings = OpenAIEmbeddings(
                 openai_api_key=self.llm_client.api_key
             )
-            
-        self.text_splitter = CharacterTextSplitter(
-            separator="\n",
-            chunk_size=1000,
-            chunk_overlap=200
-        )
-        
+        elif self.llm_client.provider == "qwen":
+            self.embeddings = DashScopeEmbeddings(
+                model="text-embedding-v3",
+                dashscope_api_key=self.llm_client.api_key,
+            )
+
         # 构建知识库向量存储
         knowledge_texts = []
         # 添加语法规则
@@ -46,7 +51,7 @@ class RAG:
             
         # 创建文档chunks
         docs = self.text_splitter.create_documents(knowledge_texts)
-        
+
         # 构建向量存储
         self.vectorstore = FAISS.from_documents(docs, self.embeddings)
     
