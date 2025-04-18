@@ -58,6 +58,8 @@ pip install openai langchain langchain-openai faiss-cpu
 ```python
 ZHIZENGZENG_API_KEY = "your-api-key"
 DEEPSEEK_API_KEY = "your-api-key"
+OPENAI_API_KEY = "your-api-key"
+QWEN_API_KEY = "your-api-key"
  ```
 
 ### 运行示例
