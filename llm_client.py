@@ -11,7 +11,7 @@ class LLMClient:
     def __init__(self, 
                  api_key: str = None, 
                  base_url: str = None,
-                 provider: str = "qwen"):  
+                 provider: str = "openai"):  
         self.provider = provider
         
         # 根据 provider 初始化不同的客户端
@@ -36,7 +36,7 @@ class LLMClient:
             )
 
 
-    def chat_completion(self, messages, model="qwq-plus", temperature=0.7, **kwargs):
+    def chat_completion(self, messages, model="gpt-4", temperature=0.7, **kwargs):
             
         return self.client.chat.completions.create(
             messages=messages,
